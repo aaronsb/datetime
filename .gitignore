@@ -9,10 +9,8 @@ build/
 *.tsbuildinfo
 
 # Test coverage
-coverage/
-coverage/**/*
+coverage/lcov.info
 *.lcov
-lcov-report/
 
 # IDE and editor files
 .vscode/
