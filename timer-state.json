@@ -1,0 +1,8 @@
+{
+  "test-timer": {
+    "id": "test-timer",
+    "description": "Testing timer functionality",
+    "startTime": 1738646805620,
+    "status": "stopped"
+  }
+}
