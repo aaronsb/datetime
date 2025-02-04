@@ -1,70 +1,175 @@
-# Date and Time Tools MCP Server
+# DateTime MCP Server
 
-A Model Context Protocol server that retrieves date and time, as well as provides basic calendar operations and calculations.
+A Model Context Protocol (MCP) server that provides powerful datetime manipulation tools with timezone support, time calculations, and persistent timer functionality.
 
-This is a TypeScript-based MCP server that implements a simple notes system. It demonstrates core MCP concepts by providing:
+## Tools
 
-- Resources representing text notes with URIs and metadata
-- Tools for creating new notes
-- Prompts for generating summaries of notes
+### 1. get_time
 
-## Features
+Get time information with optional formatting and timezone support.
 
-### Resources
-- List and access notes via `note://` URIs
-- Each note has a title, content and metadata
-- Plain text mime type for simple content access
-
-### Tools
-- `create_note` - Create new text notes
-  - Takes title and content as required parameters
-  - Stores note in server state
-
-### Prompts
-- `summarize_notes` - Generate a summary of all stored notes
-  - Includes all note contents as embedded resources
-  - Returns structured prompt for LLM summarization
-
-## Development
-
-Install dependencies:
-```bash
-npm install
+```typescript
+{
+  timezone?: string;    // IANA timezone identifier (e.g., "America/New_York")
+  date?: string;        // ISO date string, defaults to current time
+  format?: {
+    style?: 'full' | 'long' | 'medium' | 'short';
+    weekday?: 'long' | 'short' | 'narrow';
+    year?: 'numeric' | '2-digit';
+    month?: 'numeric' | '2-digit' | 'long' | 'short' | 'narrow';
+    day?: 'numeric' | '2-digit';
+    hour?: 'numeric' | '2-digit';
+    minute?: 'numeric' | '2-digit';
+    second?: 'numeric' | '2-digit';
+  };
+  info?: boolean;       // Include additional day information
+}
 ```
 
-Build the server:
-```bash
-npm run build
-```
-
-For development with auto-rebuild:
-```bash
-npm run watch
-```
-
-## Installation
-
-To use with Claude Desktop, add the server config:
-
-On MacOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
-
+Example:
 ```json
 {
-  "mcpServers": {
-    "Date and Time Tools": {
-      "command": "/path/to/Date and Time Tools/build/index.js"
-    }
+  "timezone": "America/New_York",
+  "format": {
+    "style": "full",
+    "weekday": "long"
+  },
+  "info": true
+}
+```
+
+### 2. calculate_time
+
+Perform time calculations with timezone support.
+
+```typescript
+{
+  date: string;         // ISO date string to perform calculation on
+  operation: 'add' | 'subtract';
+  amount: number;       // Amount of units to add/subtract
+  unit: 'years' | 'months' | 'days' | 'hours' | 'minutes' | 'seconds';
+  timezone?: string;    // IANA timezone identifier
+  format?: DateTimeFormat;
+}
+```
+
+Example:
+```json
+{
+  "date": "2025-02-03T23:26:35.689Z",
+  "operation": "add",
+  "amount": 2,
+  "unit": "days",
+  "timezone": "America/New_York",
+  "format": {
+    "style": "full",
+    "weekday": "long"
   }
 }
 ```
 
-### Debugging
+### 3. timer
 
-Since MCP servers communicate over stdio, debugging can be challenging. We recommend using the [MCP Inspector](https://github.com/modelcontextprotocol/inspector), which is available as a package script:
+Stopwatch functionality with persistence across sessions.
 
-```bash
-npm run inspector
+```typescript
+{
+  action: 'start' | 'stop' | 'delete';
+  id?: string;         // Optional timer identifier for multiple timers
+  description?: string;// Optional description of what the timer is tracking
+  format?: {
+    includeMilliseconds?: boolean;
+    style?: 'compact' | 'verbose'; // "1:23:45" vs "1 hour, 23 minutes, 45 seconds"
+  };
+}
 ```
 
-The Inspector will provide a URL to access debugging tools in your browser.
+Example:
+```json
+{
+  "action": "start",
+  "id": "task-timer",
+  "description": "Time spent on task",
+  "format": {
+    "style": "verbose",
+    "includeMilliseconds": true
+  }
+}
+```
+
+## Features
+
+- Timezone-aware time operations
+- Flexible date/time formatting options
+- Detailed day information (week number, day of year, etc.)
+- Time calculations in various units
+- Persistent timer functionality
+- Multiple concurrent named timers
+- Timer state persistence across sessions
+- Clean timer resource management with deletion support
+
+## Implementation Details
+
+- Timer states are stored in a JSON file for persistence
+- All times are handled in UTC internally
+- Timezone conversions use the IANA timezone database
+- Timer precision includes milliseconds
+- Timer state file is automatically created when needed
+
+## Error Handling
+
+The server includes comprehensive error handling for:
+- Invalid dates
+- Invalid timezones
+- Missing required parameters
+- Timer state management errors
+- Non-existent or already stopped timers
+
+## Usage Examples
+
+1. Get current time in New York with day info:
+```json
+{
+  "timezone": "America/New_York",
+  "format": { "style": "full" },
+  "info": true
+}
+```
+
+2. Add 3 months to a date:
+```json
+{
+  "date": "2025-01-01T00:00:00Z",
+  "operation": "add",
+  "amount": 3,
+  "unit": "months"
+}
+```
+
+3. Start a named timer:
+```json
+{
+  "action": "start",
+  "id": "project-a",
+  "description": "Time spent on Project A"
+}
+```
+
+4. Stop and get elapsed time:
+```json
+{
+  "action": "stop",
+  "id": "project-a",
+  "format": {
+    "style": "verbose",
+    "includeMilliseconds": true
+  }
+}
+```
+
+5. Delete a timer:
+```json
+{
+  "action": "delete",
+  "id": "project-a"
+}

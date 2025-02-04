@@ -8,7 +8,7 @@ import {
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
 import { DateTimeUtils } from './utils/datetime.js';
-import { TimeUnit, DateTimeFormat } from './types.js';
+import { TimeUnit, DateTimeFormat, TimerFormat } from './types.js';
 
 class DateTimeServer {
   private server: Server;
@@ -17,7 +17,7 @@ class DateTimeServer {
     this.server = new Server(
       {
         name: 'datetime',
-        version: '0.1.0',
+        version: '0.2.0',
       },
       {
         capabilities: {
@@ -40,11 +40,67 @@ class DateTimeServer {
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: [
         {
-          name: 'get_current_time',
-          description: 'Get current time in system timezone with optional formatting',
+          name: 'get_time',
+          description: 'Get time information with optional formatting and timezone support',
           inputSchema: {
             type: 'object',
             properties: {
+              timezone: {
+                type: 'string',
+                description: 'IANA timezone identifier (e.g., "America/New_York")'
+              },
+              date: {
+                type: 'string',
+                description: 'ISO date string. Defaults to current time if not provided'
+              },
+              format: {
+                type: 'object',
+                properties: {
+                  style: { type: 'string', enum: ['full', 'long', 'medium', 'short'] },
+                  weekday: { type: 'string', enum: ['long', 'short', 'narrow'] },
+                  year: { type: 'string', enum: ['numeric', '2-digit'] },
+                  month: { type: 'string', enum: ['numeric', '2-digit', 'long', 'short', 'narrow'] },
+                  day: { type: 'string', enum: ['numeric', '2-digit'] },
+                  hour: { type: 'string', enum: ['numeric', '2-digit'] },
+                  minute: { type: 'string', enum: ['numeric', '2-digit'] },
+                  second: { type: 'string', enum: ['numeric', '2-digit'] }
+                }
+              },
+              info: {
+                type: 'boolean',
+                description: 'Include additional day information like week number, day of year, etc.'
+              }
+            }
+          }
+        },
+        {
+          name: 'calculate_time',
+          description: 'Perform time calculations with timezone support',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              date: {
+                type: 'string',
+                description: 'ISO date string to perform calculation on'
+              },
+              operation: {
+                type: 'string',
+                enum: ['add', 'subtract'],
+                description: 'Whether to add or subtract the time unit'
+              },
+              amount: {
+                type: 'number',
+                description: 'Amount of units to add or subtract'
+              },
+              unit: {
+                type: 'string',
+                enum: ['years', 'months', 'days', 'hours', 'minutes', 'seconds'],
+                description: 'Time unit for calculation'
+              },
+              timezone: {
+                type: 'string',
+                description: 'IANA timezone identifier (e.g., "America/New_York")'
+              },
               format: {
                 type: 'object',
                 properties: {
@@ -58,133 +114,106 @@ class DateTimeServer {
                   second: { type: 'string', enum: ['numeric', '2-digit'] }
                 }
               }
-            }
+            },
+            required: ['date', 'operation', 'amount', 'unit']
           }
         },
         {
-          name: 'add_time',
-          description: 'Add a time unit to a date',
+          name: 'timer',
+          description: 'Stopwatch functionality with persistence across sessions',
           inputSchema: {
             type: 'object',
             properties: {
-              date: { type: 'string' },
-              timeUnit: {
+              action: {
+                type: 'string',
+                enum: ['start', 'stop', 'delete'],
+                description: 'Whether to start or stop the timer'
+              },
+              id: {
+                type: 'string',
+                description: 'Optional timer identifier for multiple concurrent timers'
+              },
+              description: {
+                type: 'string',
+                description: 'Optional description of what the timer is tracking'
+              },
+              format: {
                 type: 'object',
                 properties: {
-                  value: { type: 'number' },
-                  unit: { 
+                  includeMilliseconds: {
+                    type: 'boolean',
+                    description: 'Include milliseconds in the formatted output'
+                  },
+                  style: {
                     type: 'string',
-                    enum: ['years', 'months', 'days', 'hours', 'minutes', 'seconds']
+                    enum: ['compact', 'verbose'],
+                    description: 'Output style (e.g., "1:23:45" vs "1 hour, 23 minutes, 45 seconds")'
                   }
-                },
-                required: ['value', 'unit']
+                }
               }
             },
-            required: ['date', 'timeUnit']
-          }
-        },
-        {
-          name: 'subtract_time',
-          description: 'Subtract a time unit from a date',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              date: { type: 'string' },
-              timeUnit: {
-                type: 'object',
-                properties: {
-                  value: { type: 'number' },
-                  unit: { 
-                    type: 'string',
-                    enum: ['years', 'months', 'days', 'hours', 'minutes', 'seconds']
-                  }
-                },
-                required: ['value', 'unit']
-              }
-            },
-            required: ['date', 'timeUnit']
-          }
-        },
-        {
-          name: 'get_day_info',
-          description: 'Get detailed information about a specific date',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              date: { type: 'string' }
-            },
-            required: ['date']
+            required: ['action']
           }
         }
       ],
     }));
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      switch (request.params.name) {
-        case 'get_current_time': {
-          const format = request.params.arguments?.format as DateTimeFormat | undefined;
-          const result = DateTimeUtils.getCurrentTime(format);
-          return {
-            content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-          };
-        }
+      try {
+        switch (request.params.name) {
+          case 'get_time': {
+            const result = DateTimeUtils.getTime(request.params.arguments || {});
+            return {
+              content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+            };
+          }
 
-        case 'add_time': {
-          const args = request.params.arguments;
-          if (!args) {
-            throw new McpError(ErrorCode.InvalidParams, 'Missing arguments');
+          case 'calculate_time': {
+            if (!request.params.arguments) {
+              throw new McpError(ErrorCode.InvalidParams, 'Missing required arguments');
+            }
+            const args = request.params.arguments as {
+              date: string;
+              operation: 'add' | 'subtract';
+              amount: number;
+              unit: TimeUnit;
+              timezone?: string;
+              format?: DateTimeFormat;
+            };
+            const result = DateTimeUtils.calculateTime(args);
+            return {
+              content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+            };
           }
-          const { date, timeUnit } = args as { date: string; timeUnit: TimeUnit };
-          if (!DateTimeUtils.validateDate(date)) {
-            throw new McpError(ErrorCode.InvalidParams, 'Invalid date format');
-          }
-          if (!DateTimeUtils.validateTimeUnit(timeUnit)) {
-            throw new McpError(ErrorCode.InvalidParams, 'Invalid time unit');
-          }
-          const result = DateTimeUtils.addTime(date, timeUnit as TimeUnit);
-          return {
-            content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-          };
-        }
 
-        case 'subtract_time': {
-          const args = request.params.arguments;
-          if (!args) {
-            throw new McpError(ErrorCode.InvalidParams, 'Missing arguments');
+          case 'timer': {
+            if (!request.params.arguments?.action) {
+              throw new McpError(ErrorCode.InvalidParams, 'Missing required action parameter');
+            }
+            const args = request.params.arguments as {
+              action: 'start' | 'stop' | 'delete';
+              id?: string;
+              description?: string;
+              format?: TimerFormat;
+            };
+            const result = await DateTimeUtils.handleTimer(args);
+            return {
+              content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+            };
           }
-          const { date, timeUnit } = args as { date: string; timeUnit: TimeUnit };
-          if (!DateTimeUtils.validateDate(date)) {
-            throw new McpError(ErrorCode.InvalidParams, 'Invalid date format');
-          }
-          if (!DateTimeUtils.validateTimeUnit(timeUnit)) {
-            throw new McpError(ErrorCode.InvalidParams, 'Invalid time unit');
-          }
-          const result = DateTimeUtils.subtractTime(date, timeUnit as TimeUnit);
-          return {
-            content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-          };
-        }
 
-        case 'get_day_info': {
-          const args = request.params.arguments;
-          if (!args) {
-            throw new McpError(ErrorCode.InvalidParams, 'Missing arguments');
-          }
-          const { date } = args as { date: string };
-          if (!DateTimeUtils.validateDate(date)) {
-            throw new McpError(ErrorCode.InvalidParams, 'Invalid date format');
-          }
-          const result = DateTimeUtils.getDayInfo(date);
-          return {
-            content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-          };
+          default:
+            throw new McpError(
+              ErrorCode.MethodNotFound,
+              `Unknown tool: ${request.params.name}`
+            );
         }
-
-        default:
-          throw new McpError(
-            ErrorCode.MethodNotFound,
-            `Unknown tool: ${request.params.name}`
-          );
+      } catch (error) {
+        if (error instanceof McpError) throw error;
+        throw new McpError(
+          ErrorCode.InternalError,
+          error instanceof Error ? error.message : 'Unknown error occurred'
+        );
       }
     });
   }
