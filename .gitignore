@@ -7,7 +7,12 @@ package-lock.json
 build/
 *.js.map
 *.tsbuildinfo
+
+# Test coverage
 coverage/
+coverage/**/*
+*.lcov
+lcov-report/
 
 # IDE and editor files
 .vscode/
