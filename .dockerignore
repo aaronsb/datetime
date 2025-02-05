@@ -1,0 +1,27 @@
+# Version control
+.git
+.gitignore
+
+# Dependencies
+node_modules
+
+# Build output
+build
+
+# Test files
+tests
+coverage
+jest.config.js
+
+# Documentation
+README.md
+LICENSE
+cline_docs
+
+# Editor files
+.vscode
+*.swp
+*.swo
+
+# Logs
+*.log
