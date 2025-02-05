@@ -7,30 +7,46 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run tests
+      run: npm test
 
+  build:
+    needs: test
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
-    - name: Build Docker image
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
         context: .
-        load: true
-        tags: datetime-mcp:latest
+        push: true
+        tags: |
+          ghcr.io/${{ github.repository }}:latest
+          ghcr.io/${{ github.repository }}:${{ github.sha }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
-
-    - name: Save Docker image
-      run: docker save datetime-mcp:latest > datetime-mcp.tar
-
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: datetime-mcp-docker-image
-        path: datetime-mcp.tar
-        retention-days: 7
