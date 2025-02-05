@@ -23,6 +23,8 @@ An MCP (Model Context Protocol) server that provides powerful datetime manipulat
 
 ## Installation
 
+### Standard Installation
+
 ```bash
 # Clone the repository
 git clone [repository-url]
@@ -34,6 +36,40 @@ npm install
 # Build the project
 npm run build
 ```
+
+### Docker Installation
+
+You can run this server using Docker in two ways:
+
+#### 1. Pull from GitHub Container Registry
+
+```bash
+# Pull the latest version
+docker pull ghcr.io/aaronsb/datetime:latest
+
+# Run the container
+docker run -it --rm ghcr.io/aaronsb/datetime
+```
+
+#### 2. Build Locally
+
+```bash
+# Build the image
+docker build -t datetime-mcp .
+
+# Run the container
+docker run -it --rm datetime-mcp
+```
+
+The Docker image:
+- Is automatically built and tested via GitHub Actions
+- Tagged with both latest and commit-specific versions
+- Available on GitHub Container Registry (ghcr.io)
+
+Note: To access the GitHub Container Registry:
+1. Go to repository settings
+2. Navigate to Actions > General
+3. Enable "Read and write permissions" under "Workflow permissions"
 
 ## Usage
 
