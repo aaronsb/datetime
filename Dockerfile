@@ -1,4 +1,4 @@
-# Build stage
+# Build stage for datetime MCP server
 FROM node:20-slim AS builder
 
 WORKDIR /app
